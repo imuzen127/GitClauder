@@ -103,10 +103,10 @@ async function updateTaskStatus(sheets, rowIndex, status, result = '', sessionId
 }
 
 /**
- * セッションレポートを読み込む
+ * 統合会話レポートを読み込む
  */
-function loadSessionReport(workDir, sessionId) {
-  const reportPath = path.join(workDir, 'reports', `session-${sessionId}.md`);
+function loadConversationReport(workDir) {
+  const reportPath = path.join(workDir, 'reports', 'conversation-history.md');
   if (fs.existsSync(reportPath)) {
     return fs.readFileSync(reportPath, 'utf8');
   }
@@ -114,17 +114,17 @@ function loadSessionReport(workDir, sessionId) {
 }
 
 /**
- * セッションレポートを保存
+ * 統合会話レポートを保存
  */
-function saveSessionReport(workDir, sessionId, taskId, instruction, result) {
+function saveConversationReport(workDir, sessionId, taskId, instruction, result) {
   const reportsDir = path.join(workDir, 'reports');
   if (!fs.existsSync(reportsDir)) {
     fs.mkdirSync(reportsDir, { recursive: true });
   }
 
-  const reportPath = path.join(reportsDir, `session-${sessionId}.md`);
+  const reportPath = path.join(reportsDir, 'conversation-history.md');
   const timestamp = new Date().toISOString();
-  const report = `## [タスク ${taskId}] ${timestamp}\n\n### 指示\n${instruction}\n\n### 結果\n${result}\n\n---\n\n`;
+  const report = `## [タスク ${taskId}] ${timestamp} (SessionID: ${sessionId})\n\n### 指示\n${instruction}\n\n### 結果\n${result}\n\n---\n\n`;
 
   fs.appendFileSync(reportPath, report, 'utf8');
 }
@@ -262,35 +262,35 @@ async function main() {
 
       const workDir = path.join(__dirname, '..');
 
-      // STEP 1: レポートを読み込む
-      console.log(`[タスク ${task.id}] セッションレポートを読み込み中...`);
-      const sessionContext = loadSessionReport(workDir, sessionId);
-      if (sessionContext) {
-        console.log(`[タスク ${task.id}] 既存の会話履歴を発見（${sessionContext.length}文字）`);
+      // STEP 1: 統合会話レポートを読み込む（全タスク共通）
+      console.log(`[タスク ${task.id}] 統合会話レポートを読み込み中...`);
+      const conversationHistory = loadConversationReport(workDir);
+      if (conversationHistory) {
+        console.log(`[タスク ${task.id}] 既存の会話履歴を発見（${conversationHistory.length}文字）`);
       } else {
-        console.log(`[タスク ${task.id}] 新規セッション`);
+        console.log(`[タスク ${task.id}] 初回タスク`);
       }
 
       // ステータスを「処理中」に更新（セッションIDも設定）
       await updateTaskStatus(sheets, task.rowIndex, STATUS.PROCESSING, '', sessionId);
 
-      // STEP 2: 指示を構築（レポートがあれば含める）
+      // STEP 2: 指示を構築（全タスクの会話履歴を含める）
       let fullInstruction = task.instruction;
-      if (sessionContext) {
-        fullInstruction = `これまでの会話履歴:\n\n${sessionContext}\n\n---\n\n新しい指示: ${task.instruction}`;
+      if (conversationHistory) {
+        fullInstruction = `これまでの全タスク履歴:\n\n${conversationHistory}\n\n---\n\n新しい指示: ${task.instruction}`;
       }
 
-      // STEP 3: Claude Code CLIで実行（レポート読み込みは既に完了）
-      console.log(`[タスク ${task.id}] Claude Code CLI実行中...`);
+      // STEP 3: Claude Code CLIで実行（SessionIDは局所的な会話継続用）
+      console.log(`[タスク ${task.id}] Claude Code CLI実行中（SessionID: ${sessionId}）...`);
       const result = await executeWithClaudeCLI(fullInstruction, sessionId, workDir);
 
       // 結果を書き込み
       const now = new Date().toISOString();
       const status = result.success ? STATUS.COMPLETED : STATUS.ERROR;
 
-      // STEP 4: セッションレポートを保存
-      console.log(`[タスク ${task.id}] セッションレポートを更新中...`);
-      saveSessionReport(workDir, sessionId, task.id, task.instruction, result.result);
+      // STEP 4: 統合会話レポートに追記
+      console.log(`[タスク ${task.id}] 統合会話レポートを更新中...`);
+      saveConversationReport(workDir, sessionId, task.id, task.instruction, result.result);
       console.log(`[タスク ${task.id}] レポート更新完了`);
 
       // スプレッドシートのセル制限（50,000文字）を考慮
