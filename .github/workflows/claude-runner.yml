@@ -50,6 +50,12 @@ jobs:
           echo "Credentials file structure (first 100 chars)..."
           head -c 100 ~/.claude/.credentials.json || echo "Cannot read credentials"
 
+      - name: Test - Simple Claude CLI execution
+        timeout-minutes: 2
+        run: |
+          echo "Testing simple Claude CLI command with timeout..."
+          timeout 60s claude --print "Hello" --output-format text || echo "Command failed or timed out"
+
       - name: Install dependencies
         run: |
           cd scripts
