@@ -99,7 +99,57 @@ async function setupSheet() {
       }
     });
 
+    // Sheet2の制御パラメータを設定
+    const controlHeaders = [
+      ['動作', '更新時間', 'タイムアウト制限']
+    ];
+
+    const controlData = [
+      ['稼働', 300, 300]
+    ];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Sheet2!A1:C1',
+      valueInputOption: 'RAW',
+      resource: { values: controlHeaders }
+    });
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Sheet2!A2:C2',
+      valueInputOption: 'RAW',
+      resource: { values: controlData }
+    });
+
+    // Sheet2のヘッダー行を太字にする
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            repeatCell: {
+              range: {
+                sheetId: 1,  // Sheet2のID
+                startRowIndex: 0,
+                endRowIndex: 1
+              },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 },
+                  textFormat: { bold: true }
+                }
+              },
+              fields: 'userEnteredFormat(backgroundColor,textFormat)'
+            }
+          }
+        ]
+      }
+    });
+
     console.log('スプレッドシートのセットアップが完了しました！');
+    console.log('Sheet1: タスク管理');
+    console.log('Sheet2: 制御パラメータ（動作: 稼働/停止、更新時間: 秒、タイムアウト制限: 秒）');
     console.log(`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`);
   } catch (error) {
     console.error('エラー:', error.message);

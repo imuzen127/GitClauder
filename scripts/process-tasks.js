@@ -51,6 +51,32 @@ async function initGoogleSheets() {
 }
 
 /**
+ * Sheet2から制御パラメータを取得
+ */
+async function getControlParams(sheets) {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Sheet2!A2:C2'
+    });
+
+    const row = response.data.values?.[0] || [];
+    return {
+      operation: row[0] || '稼働',  // 動作: 稼働 or 停止
+      updateInterval: parseInt(row[1]) || 300,  // 更新時間（秒）
+      timeout: parseInt(row[2]) || 300  // タイムアウト制限（秒）
+    };
+  } catch (error) {
+    console.log('Sheet2が見つかりません。デフォルト値を使用します。');
+    return {
+      operation: '稼働',
+      updateInterval: 300,
+      timeout: 300
+    };
+  }
+}
+
+/**
  * スプレッドシートから全タスクを取得
  */
 async function getTasks(sheets) {
@@ -257,7 +283,7 @@ function analyzeResultForNextPriority(result, success) {
  * Claude Code CLIでタスクを実行
  * 注: レポートの読み込みは呼び出し側で行う
  */
-async function executeWithClaudeCLI(instruction, sessionId = null, workDir = null) {
+async function executeWithClaudeCLI(instruction, sessionId = null, workDir = null, timeoutSeconds = 600) {
   try {
     // 作業ディレクトリ（リポジトリのルート）
     if (!workDir) {
@@ -301,10 +327,11 @@ async function executeWithClaudeCLI(instruction, sessionId = null, workDir = nul
         stderrData += data;
       });
 
+      const timeoutMs = timeoutSeconds * 1000;
       const timeout = setTimeout(() => {
         child.kill('SIGTERM');
-        reject(new Error('Timeout after 10 minutes'));
-      }, 600000);
+        reject(new Error(`Timeout after ${timeoutSeconds} seconds`));
+      }, timeoutMs);
 
       child.on('close', (code) => {
         clearTimeout(timeout);
@@ -362,6 +389,19 @@ async function main() {
     // Google Sheets APIを初期化
     const sheets = await initGoogleSheets();
 
+    // 制御パラメータを取得
+    console.log('制御パラメータを取得中...');
+    const controlParams = await getControlParams(sheets);
+    console.log(`動作: ${controlParams.operation}`);
+    console.log(`更新時間: ${controlParams.updateInterval}秒`);
+    console.log(`タイムアウト制限: ${controlParams.timeout}秒`);
+
+    // 停止状態の場合は処理を終了
+    if (controlParams.operation === '停止') {
+      console.log('Sheet2の動作が「停止」に設定されています。処理を終了します。');
+      return;
+    }
+
     console.log('スプレッドシートからタスクを取得中...');
     const tasks = await getTasks(sheets);
 
@@ -409,8 +449,8 @@ async function main() {
       }
 
       // STEP 3: Claude Code CLIで実行（SessionIDは局所的な会話継続用）
-      console.log(`[タスク ${task.id}] Claude Code CLI実行中（SessionID: ${sessionId}）...`);
-      const result = await executeWithClaudeCLI(fullInstruction, sessionId, workDir);
+      console.log(`[タスク ${task.id}] Claude Code CLI実行中（SessionID: ${sessionId}、タイムアウト: ${controlParams.timeout}秒）...`);
+      const result = await executeWithClaudeCLI(fullInstruction, sessionId, workDir, controlParams.timeout);
 
       // 結果を書き込み
       const now = new Date().toISOString();
