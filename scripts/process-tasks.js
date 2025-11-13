@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { google } = require('googleapis');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const path = require('path');
 
@@ -111,14 +111,46 @@ async function executeWithClaudeCLI(instruction, sessionId = null) {
     console.log(`実行コマンド: ${command}`);
     console.log(`作業ディレクトリ: ${workDir}`);
 
-    // Claude Code CLIを実行
-    const { stdout, stderr } = await execAsync(command, {
-      cwd: workDir,
-      maxBuffer: 10 * 1024 * 1024,  // 10MB
-      timeout: 600000,  // 10分
-      env: process.env,  // 環境変数を引き継ぐ
-      shell: true  // シェルを使用
+    // Claude Code CLIを実行（stdinを閉じる）
+    const result = await new Promise((resolve, reject) => {
+      const child = spawn('sh', ['-c', command], {
+        cwd: workDir,
+        env: process.env,
+        stdio: ['ignore', 'pipe', 'pipe']  // stdin を無視
+      });
+
+      let stdoutData = '';
+      let stderrData = '';
+
+      child.stdout.on('data', (data) => {
+        stdoutData += data;
+      });
+
+      child.stderr.on('data', (data) => {
+        stderrData += data;
+      });
+
+      const timeout = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error('Timeout after 10 minutes'));
+      }, 600000);
+
+      child.on('close', (code) => {
+        clearTimeout(timeout);
+        if (code === 0) {
+          resolve({ stdout: stdoutData, stderr: stderrData });
+        } else {
+          reject(new Error(`Command failed with code ${code}: ${stderrData}`));
+        }
+      });
+
+      child.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
+
+    const { stdout, stderr } = result;
 
     // セッションIDを抽出（新規セッションの場合）
     let newSessionId = sessionId;
