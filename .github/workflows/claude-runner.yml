@@ -52,6 +52,8 @@ jobs:
 
       - name: Test - Simple Claude CLI execution
         timeout-minutes: 2
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           echo "Testing simple Claude CLI command with timeout..."
           timeout 60s claude --print "Hello" --output-format text || echo "Command failed or timed out"
@@ -63,6 +65,7 @@ jobs:
 
       - name: Run Claude Code task processor
         env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
         run: |
