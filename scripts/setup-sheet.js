@@ -4,6 +4,18 @@ const { google } = require('googleapis');
 require('dotenv').config();
 
 /**
+ * 日本時間（JST, UTC+9）のISO形式文字列を取得
+ */
+function getJSTTimestamp() {
+  const now = new Date();
+  const jstOffset = 9 * 60 * 60 * 1000; // 9時間のミリ秒
+  const jstTime = new Date(now.getTime() + jstOffset);
+
+  // ISO形式で出力し、末尾の'Z'を'+09:00'に置き換える
+  return jstTime.toISOString().replace('Z', '+09:00');
+}
+
+/**
  * スプレッドシートにヘッダーを設定するスクリプト
  */
 async function setupSheet() {
@@ -38,9 +50,10 @@ async function setupSheet() {
     });
 
     // サンプルタスクを追加
+    const now = getJSTTimestamp();
     const sampleTasks = [
-      ['1', 'こんにちは、自己紹介してください。あなたは何ができますか？', '待機中', '', '', new Date().toISOString(), ''],
-      ['2', 'このリポジトリ（GitClauder）にREADME.mdファイルがあるか確認して、内容を要約してください', '待機中', '', '', new Date().toISOString(), '']
+      ['1', 'こんにちは、自己紹介してください。あなたは何ができますか？', '待機中', '', '', now, ''],
+      ['2', 'このリポジトリ（GitClauder）にREADME.mdファイルがあるか確認して、内容を要約してください', '待機中', '', '', now, '']
     ];
 
     await sheets.spreadsheets.values.update({

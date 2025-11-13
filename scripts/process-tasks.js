@@ -32,6 +32,18 @@ const STATUS = {
 };
 
 /**
+ * 日本時間（JST, UTC+9）のISO形式文字列を取得
+ */
+function getJSTTimestamp() {
+  const now = new Date();
+  const jstOffset = 9 * 60 * 60 * 1000; // 9時間のミリ秒
+  const jstTime = new Date(now.getTime() + jstOffset);
+
+  // ISO形式で出力し、末尾の'Z'を'+09:00'に置き換える
+  return jstTime.toISOString().replace('Z', '+09:00');
+}
+
+/**
  * Google Sheets APIクライアントを初期化
  */
 async function initGoogleSheets() {
@@ -200,7 +212,7 @@ function saveConversationReport(workDir, sessionId, taskId, instruction, result)
   }
 
   const priority1Path = path.join(reportsDir, 'priority-1.md');
-  const timestamp = new Date().toISOString();
+  const timestamp = getJSTTimestamp();
   const report = `## [タスク ${taskId}] ${timestamp} (SessionID: ${sessionId})\n\n### 指示\n${instruction}\n\n### 結果\n${result}\n\n---\n\n`;
 
   fs.appendFileSync(priority1Path, report, 'utf8');
@@ -453,7 +465,7 @@ async function main() {
       const result = await executeWithClaudeCLI(fullInstruction, sessionId, workDir, controlParams.timeout);
 
       // 結果を書き込み
-      const now = new Date().toISOString();
+      const now = getJSTTimestamp();
       const status = result.success ? STATUS.COMPLETED : STATUS.ERROR;
 
       // STEP 4: 会話レポートに追記（重要度1）
