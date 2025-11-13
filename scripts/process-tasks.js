@@ -4,6 +4,7 @@ const { google } = require('googleapis');
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const path = require('path');
+const crypto = require('crypto');
 
 const execAsync = promisify(exec);
 
@@ -74,14 +75,29 @@ async function getTasks(sheets) {
  * タスクのステータスと結果を更新
  */
 async function updateTaskStatus(sheets, rowIndex, status, result = '', sessionId = '', completedAt = '') {
-  const range = `Sheet1!C${rowIndex}:G${rowIndex}`;
-  const values = [[status, result, sessionId, '', completedAt]];
+  // C列(status), D列(result), E列(sessionId), G列(completedAt)を更新
+  // F列(createdAt)は上書きしない
+  const updates = [
+    {
+      range: `Sheet1!C${rowIndex}:E${rowIndex}`,
+      values: [[status, result, sessionId]]
+    }
+  ];
 
-  await sheets.spreadsheets.values.update({
+  // 完了日時がある場合のみG列を更新
+  if (completedAt) {
+    updates.push({
+      range: `Sheet1!G${rowIndex}`,
+      values: [[completedAt]]
+    });
+  }
+
+  await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,
-    range,
-    valueInputOption: 'RAW',
-    resource: { values }
+    resource: {
+      valueInputOption: 'RAW',
+      data: updates
+    }
   });
 }
 
@@ -208,11 +224,16 @@ async function main() {
       console.log(`指示: ${task.instruction.substring(0, 100)}${task.instruction.length > 100 ? '...' : ''}`);
       console.log(`========================================\n`);
 
-      // ステータスを「処理中」に更新
-      await updateTaskStatus(sheets, task.rowIndex, STATUS.PROCESSING);
+      // セッションIDを生成または取得
+      let sessionId = task.sessionId && task.sessionId.trim() !== ''
+        ? task.sessionId
+        : crypto.randomUUID();
+
+      // ステータスを「処理中」に更新（セッションIDも設定）
+      await updateTaskStatus(sheets, task.rowIndex, STATUS.PROCESSING, '', sessionId);
 
       // Claude Code CLIで実行
-      const result = await executeWithClaudeCLI(task.instruction, task.sessionId);
+      const result = await executeWithClaudeCLI(task.instruction, sessionId);
 
       // 結果を書き込み
       const now = new Date().toISOString();
