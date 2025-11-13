@@ -39,6 +39,17 @@ jobs:
           echo "$CLAUDE_CREDENTIALS" > ~/.claude/.credentials.json
           chmod 600 ~/.claude/.credentials.json
 
+      - name: Debug - Verify Claude CLI installation
+        run: |
+          echo "Checking Claude CLI version..."
+          claude --version || echo "Claude CLI version check failed"
+          echo "Checking Claude CLI path..."
+          which claude || echo "Claude CLI not found in PATH"
+          echo "Checking credentials file..."
+          ls -la ~/.claude/.credentials.json || echo "Credentials file not found"
+          echo "Credentials file structure (first 100 chars)..."
+          head -c 100 ~/.claude/.credentials.json || echo "Cannot read credentials"
+
       - name: Install dependencies
         run: |
           cd scripts
