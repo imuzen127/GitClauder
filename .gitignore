@@ -23,6 +23,8 @@ Thumbs.db
 # Google credentials
 credentials.json
 token.json
+google-credentials-for-github.json
+scripts/.env
 
 # Claude Code credentials
 .claude/

@@ -77,4 +77,5 @@ jobs:
           git config --local user.email "claude-bot@github.com"
           git config --local user.name "Claude Code Bot"
           git add -A
-          git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Claude Code: Task execution results [skip ci]" && git push)
+          git add reports/ || true
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Claude Code: Task execution results and session reports [skip ci]" && git push)

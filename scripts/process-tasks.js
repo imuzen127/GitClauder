@@ -5,6 +5,7 @@ const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 
 const execAsync = promisify(exec);
 
@@ -102,12 +103,50 @@ async function updateTaskStatus(sheets, rowIndex, status, result = '', sessionId
 }
 
 /**
+ * セッションレポートを読み込む
+ */
+function loadSessionReport(workDir, sessionId) {
+  const reportPath = path.join(workDir, 'reports', `session-${sessionId}.md`);
+  if (fs.existsSync(reportPath)) {
+    return fs.readFileSync(reportPath, 'utf8');
+  }
+  return '';
+}
+
+/**
+ * セッションレポートを保存
+ */
+function saveSessionReport(workDir, sessionId, taskId, instruction, result) {
+  const reportsDir = path.join(workDir, 'reports');
+  if (!fs.existsSync(reportsDir)) {
+    fs.mkdirSync(reportsDir, { recursive: true });
+  }
+
+  const reportPath = path.join(reportsDir, `session-${sessionId}.md`);
+  const timestamp = new Date().toISOString();
+  const report = `## [タスク ${taskId}] ${timestamp}\n\n### 指示\n${instruction}\n\n### 結果\n${result}\n\n---\n\n`;
+
+  fs.appendFileSync(reportPath, report, 'utf8');
+}
+
+/**
  * Claude Code CLIでタスクを実行
  */
-async function executeWithClaudeCLI(instruction, sessionId = null) {
+async function executeWithClaudeCLI(instruction, sessionId = null, workDir = null) {
   try {
     // 作業ディレクトリ（リポジトリのルート）
-    const workDir = path.join(__dirname, '..');
+    if (!workDir) {
+      workDir = path.join(__dirname, '..');
+    }
+
+    // セッションレポートを読み込んで指示に追加
+    let fullInstruction = instruction;
+    if (sessionId) {
+      const sessionContext = loadSessionReport(workDir, sessionId);
+      if (sessionContext) {
+        fullInstruction = `これまでの会話履歴:\n\n${sessionContext}\n\n---\n\n新しい指示: ${instruction}`;
+      }
+    }
 
     // Claude Codeコマンドを構築
     let command = 'claude --print --dangerously-skip-permissions';
@@ -118,7 +157,7 @@ async function executeWithClaudeCLI(instruction, sessionId = null) {
     }
 
     // 指示を追加（エスケープ処理）
-    const escapedInstruction = instruction.replace(/"/g, '\\"');
+    const escapedInstruction = fullInstruction.replace(/"/g, '\\"');
     command += ` "${escapedInstruction}"`;
 
     // 出力形式はテキスト
@@ -233,14 +272,18 @@ async function main() {
       await updateTaskStatus(sheets, task.rowIndex, STATUS.PROCESSING, '', sessionId);
 
       // Claude Code CLIで実行
-      const result = await executeWithClaudeCLI(task.instruction, sessionId);
+      const workDir = path.join(__dirname, '..');
+      const result = await executeWithClaudeCLI(task.instruction, sessionId, workDir);
 
       // 結果を書き込み
       const now = new Date().toISOString();
       const status = result.success ? STATUS.COMPLETED : STATUS.ERROR;
 
+      // セッションレポートを保存
+      saveSessionReport(workDir, sessionId, task.id, task.instruction, result.result);
+
       // スプレッドシートのセル制限（50,000文字）を考慮
-      const truncatedResult = result.result.substring(0, 50000);
+      let truncatedResult = result.result.substring(0, 50000);
       if (result.result.length > 50000) {
         truncatedResult += '\n\n... (結果が長すぎるため切り詰められました)';
       }
