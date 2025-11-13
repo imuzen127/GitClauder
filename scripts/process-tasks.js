@@ -94,7 +94,7 @@ async function executeWithClaudeCLI(instruction, sessionId = null) {
     const workDir = path.join(__dirname, '..');
 
     // Claude Codeコマンドを構築
-    let command = 'claude --print';
+    let command = 'claude --print --dangerously-skip-permissions';
 
     // セッションIDがある場合は継続
     if (sessionId) {
