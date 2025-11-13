@@ -115,7 +115,8 @@ async function executeWithClaudeCLI(instruction, sessionId = null) {
     const { stdout, stderr } = await execAsync(command, {
       cwd: workDir,
       maxBuffer: 10 * 1024 * 1024,  // 10MB
-      timeout: 600000  // 10分
+      timeout: 600000,  // 10分
+      env: process.env  // 環境変数を引き継ぐ
     });
 
     // セッションIDを抽出（新規セッションの場合）
