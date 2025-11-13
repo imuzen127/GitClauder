@@ -131,21 +131,13 @@ function saveSessionReport(workDir, sessionId, taskId, instruction, result) {
 
 /**
  * Claude Code CLIでタスクを実行
+ * 注: レポートの読み込みは呼び出し側で行う
  */
 async function executeWithClaudeCLI(instruction, sessionId = null, workDir = null) {
   try {
     // 作業ディレクトリ（リポジトリのルート）
     if (!workDir) {
       workDir = path.join(__dirname, '..');
-    }
-
-    // セッションレポートを読み込んで指示に追加
-    let fullInstruction = instruction;
-    if (sessionId) {
-      const sessionContext = loadSessionReport(workDir, sessionId);
-      if (sessionContext) {
-        fullInstruction = `これまでの会話履歴:\n\n${sessionContext}\n\n---\n\n新しい指示: ${instruction}`;
-      }
     }
 
     // Claude Codeコマンドを構築
@@ -157,7 +149,7 @@ async function executeWithClaudeCLI(instruction, sessionId = null, workDir = nul
     }
 
     // 指示を追加（エスケープ処理）
-    const escapedInstruction = fullInstruction.replace(/"/g, '\\"');
+    const escapedInstruction = instruction.replace(/"/g, '\\"');
     command += ` "${escapedInstruction}"`;
 
     // 出力形式はテキスト
@@ -268,19 +260,38 @@ async function main() {
         ? task.sessionId
         : crypto.randomUUID();
 
+      const workDir = path.join(__dirname, '..');
+
+      // STEP 1: レポートを読み込む
+      console.log(`[タスク ${task.id}] セッションレポートを読み込み中...`);
+      const sessionContext = loadSessionReport(workDir, sessionId);
+      if (sessionContext) {
+        console.log(`[タスク ${task.id}] 既存の会話履歴を発見（${sessionContext.length}文字）`);
+      } else {
+        console.log(`[タスク ${task.id}] 新規セッション`);
+      }
+
       // ステータスを「処理中」に更新（セッションIDも設定）
       await updateTaskStatus(sheets, task.rowIndex, STATUS.PROCESSING, '', sessionId);
 
-      // Claude Code CLIで実行
-      const workDir = path.join(__dirname, '..');
-      const result = await executeWithClaudeCLI(task.instruction, sessionId, workDir);
+      // STEP 2: 指示を構築（レポートがあれば含める）
+      let fullInstruction = task.instruction;
+      if (sessionContext) {
+        fullInstruction = `これまでの会話履歴:\n\n${sessionContext}\n\n---\n\n新しい指示: ${task.instruction}`;
+      }
+
+      // STEP 3: Claude Code CLIで実行（レポート読み込みは既に完了）
+      console.log(`[タスク ${task.id}] Claude Code CLI実行中...`);
+      const result = await executeWithClaudeCLI(fullInstruction, sessionId, workDir);
 
       // 結果を書き込み
       const now = new Date().toISOString();
       const status = result.success ? STATUS.COMPLETED : STATUS.ERROR;
 
-      // セッションレポートを保存
+      // STEP 4: セッションレポートを保存
+      console.log(`[タスク ${task.id}] セッションレポートを更新中...`);
       saveSessionReport(workDir, sessionId, task.id, task.instruction, result.result);
+      console.log(`[タスク ${task.id}] レポート更新完了`);
 
       // スプレッドシートのセル制限（50,000文字）を考慮
       let truncatedResult = result.result.substring(0, 50000);
