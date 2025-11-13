@@ -1,0 +1,60 @@
+name: Claude Code Task Runner
+
+on:
+  schedule:
+    # 5分ごとに実行（必要に応じて調整可能）
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # 手動実行も可能
+    inputs:
+      force_run:
+        description: '強制実行'
+        required: false
+        default: 'false'
+
+jobs:
+  run-claude-tasks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code CLI
+        run: |
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Setup Claude Code credentials
+        env:
+          CLAUDE_CREDENTIALS: ${{ secrets.CLAUDE_CREDENTIALS }}
+        run: |
+          mkdir -p ~/.claude
+          echo "$CLAUDE_CREDENTIALS" > ~/.claude/.credentials.json
+          chmod 600 ~/.claude/.credentials.json
+
+      - name: Install dependencies
+        run: |
+          cd scripts
+          npm install
+
+      - name: Run Claude Code task processor
+        env:
+          GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: |
+          cd scripts
+          node process-tasks.js
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "claude-bot@github.com"
+          git config --local user.name "Claude Code Bot"
+          git add -A
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Claude Code: Task execution results [skip ci]" && git push)

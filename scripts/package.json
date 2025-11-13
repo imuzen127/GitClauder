@@ -1,0 +1,13 @@
+{
+  "name": "gitclauder-scripts",
+  "version": "1.0.0",
+  "description": "Scripts to run Claude Code CLI tasks from Google Sheets",
+  "main": "process-tasks.js",
+  "scripts": {
+    "start": "node process-tasks.js"
+  },
+  "dependencies": {
+    "googleapis": "^144.0.0",
+    "dotenv": "^16.4.5"
+  }
+}
