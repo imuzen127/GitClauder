@@ -181,3 +181,17 @@ Stderr:
 
 ---
 
+## [タスク 20] 2025-11-14T11:25:13.971+09:00 (SessionID: 66cc11e0-22f5-4438-b596-e7261964bb79)
+
+### 指示
+Claude code CLI ってネット経由で回答を生成しているの？ネットに繋がっていなければ使えないということ？AIの頭脳部分をネットに頼らず動かすにはローカル用のAIモデルを使う必要あり？
+
+### 結果
+エラー: Command failed with code 2: /bin/sh: 6: チェスで一度も動かしていないルークとキングを同時に動かせるやつを何という？: not found
+/bin/sh: 9: Syntax error: word unexpected (expecting ")")
+
+
+Stderr: 
+
+---
+
