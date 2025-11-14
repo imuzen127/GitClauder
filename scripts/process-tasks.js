@@ -302,30 +302,30 @@ async function executeWithClaudeCLI(instruction, sessionId = null, workDir = nul
       workDir = path.join(__dirname, '..');
     }
 
-    // Claude Codeコマンドを構築
-    let command = 'claude --print --dangerously-skip-permissions';
+    // Claude Codeコマンドの引数を配列として構築
+    const args = ['--print', '--dangerously-skip-permissions'];
 
     // セッションIDがある場合は継続
     if (sessionId) {
-      command += ` --session-id "${sessionId}"`;
+      args.push('--session-id', sessionId);
     }
 
-    // 指示を追加（エスケープ処理）
-    const escapedInstruction = instruction.replace(/"/g, '\\"');
-    command += ` "${escapedInstruction}"`;
+    // 指示を追加（引数として直接渡すのでエスケープ不要）
+    args.push(instruction);
 
     // 出力形式はテキスト
-    command += ' --output-format text';
+    args.push('--output-format', 'text');
 
-    console.log(`実行コマンド: ${command}`);
+    console.log(`実行コマンド: claude ${args.map(a => a.length > 50 ? a.substring(0, 50) + '...' : a).join(' ')}`);
     console.log(`作業ディレクトリ: ${workDir}`);
 
     // Claude Code CLIを実行（stdinを閉じる）
     const result = await new Promise((resolve, reject) => {
-      const child = spawn('sh', ['-c', command], {
+      const child = spawn('claude', args, {
         cwd: workDir,
         env: process.env,
-        stdio: ['ignore', 'pipe', 'pipe']  // stdin を無視
+        stdio: ['ignore', 'pipe', 'pipe'],  // stdin を無視
+        shell: true  // クロスプラットフォーム対応
       });
 
       let stdoutData = '';
