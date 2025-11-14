@@ -324,8 +324,7 @@ async function executeWithClaudeCLI(instruction, sessionId = null, workDir = nul
       const child = spawn('claude', args, {
         cwd: workDir,
         env: process.env,
-        stdio: ['ignore', 'pipe', 'pipe'],  // stdin を無視
-        shell: true  // クロスプラットフォーム対応
+        stdio: ['ignore', 'pipe', 'pipe']  // stdin を無視
       });
 
       let stdoutData = '';
